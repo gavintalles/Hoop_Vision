@@ -11,11 +11,11 @@ tested and reasoned about on its own.
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  UI LAYER         f7Page + f7TabLayout, one module per tab    │
-│                   (R/ui.R, R/modules/mod_*.R UI functions)    │
+│                   (R/ui.R, R/modules/*.R  UI functions)       │
 ├─────────────────────────────────────────────────────────────┤
 │  MODULE/SERVER    reactive logic per feature; reads cache,    │
 │                   applies scoring, renders tables & charts    │
-│                   (R/modules/mod_*.R server functions)        │
+│                   (R/modules/*.R  server functions)           │
 ├─────────────────────────────────────────────────────────────┤
 │  SERVICE LAYER    pure functions: scoring, projections,       │
 │                   formatting, filtering (R/data/, R/utils/)   │
@@ -40,7 +40,7 @@ the data layer reads from `data-cache/`.
   refresh_cache.R                     user opens a tab
         │                                   │
         ▼                                   ▼
-  hoopR::load_nba_* ()              mod_*  server function
+  hoopR::load_nba_* ()              <feature>Server  function
         │                                   │
         ▼                                   ▼
   ingest_*.R  (clean,               load_*.R  (read parquet,
@@ -50,7 +50,7 @@ the data layer reads from `data-cache/`.
   data-cache/*.parquet  ───────────►  fantasy_score() / projection helpers
                                             │
                                             ▼
-                                      reactable / apexcharter  →  f7Card
+                                      reactable / echarts4r  →  f7Card
 ```
 
 `global.R` loads the small, always-needed cache tables (player index, team directory,
@@ -71,7 +71,7 @@ read on demand inside modules with column/row filters, not held entirely in memo
 | `R/data/load_*.R`         | **no network**: read parquet, return tibble                     |
 | `R/data/fantasy_score.R`  | pure scoring functions (see `docs/FANTASY_SPEC.md`)             |
 | `R/data/projections.R`    | rolling-average / rest-of-season projections                    |
-| `R/modules/mod_*.R`       | one feature each: `mod_<x>_ui()` + `mod_<x>_server()`           |
+| `R/modules/*.R`           | one feature each: `<feature>UI()` + `<feature>Server()`          |
 | `R/utils/theme.R`         | colors, team palette, f7 theme options                          |
 | `R/utils/format.R`        | number/stat formatting helpers                                  |
 | `scripts/refresh_cache.R` | orchestrates all ingest_*.R; entrypoint for cron/Action         |
@@ -82,28 +82,32 @@ read on demand inside modules with column/row filters, not held entirely in memo
 ## 4. The Shiny module contract
 
 Every feature is a module. Follow this shape exactly so modules stay swappable and
-testable:
+testable. **Naming follows the SlamStats house style** (see `docs/CONVENTIONS.md` §2):
+one file per feature in `R/modules/`, named in camelCase after the feature
+(`playerExplorer.R`), exporting `<feature>UI()` and `<feature>Server()`. We keep
+**descriptive** names (`playerExplorerUI`, not the terse `playerUI`).
 
 ```r
-# R/modules/mod_player_explorer.R
+# R/modules/playerExplorer.R
 
 #' Player Explorer UI
 #' @param id module id
-mod_player_explorer_ui <- function(id) {
+playerExplorerUI <- function(id) {
   ns <- NS(id)
   f7Tab(
-    tabName = "Players", icon = f7Icon("person_2_fill"),
+    title = "Players", tabName = "players", icon = f7Icon("person_2_fill"),
     f7Searchbar(id = ns("search"), inline = TRUE),
     uiOutput(ns("player_card")),
-    apexchartOutput(ns("trend"))
+    echarts4rOutput(ns("trend"))
   )
 }
 
 #' Player Explorer server
 #' @param id module id
-#' @param player_box reactive returning the cached player_box tibble
-#' @param scoring   reactive returning the active scoring profile
-mod_player_explorer_server <- function(id, player_box, scoring) {
+#' @param player_box reactive: the cached, scored player_box tibble (changes with scoring/season)
+#' @param scoring    reactive: the active scoring profile
+#' @param r          shared reactiveValues for cross-module signals (see §5)
+playerExplorerServer <- function(id, player_box, scoring, r) {
   moduleServer(id, function(input, output, session) {
     # 1. read inputs  2. filter cached data  3. apply service-layer functions
     # 4. render. No hoopR calls here.
@@ -112,11 +116,32 @@ mod_player_explorer_server <- function(id, player_box, scoring) {
 ```
 
 Rules:
-- Modules receive cached data and shared state **as reactive arguments**, not by
-  reaching into globals. This makes them unit-testable.
 - A module never calls `hoopR`. If it needs data not in the cache, that's a signal to
-  add an ingest step + cache table first.
+  add an ingest step + cache table first. (SlamStats relaxes this — it calls
+  `wehoop::espn_*` inside modules — but Hoop Vision keeps the quarantine; see
+  `docs/DATA_HOOPR.md`.)
 - UI function returns an `f7Tab` (for tab-level modules) or a UI fragment.
+- Modules may **nest**: a parent server can call a child `<thing>Server()` per item,
+  namespacing with `ns(<id>)`. SlamStats does this — `teamServer` spawns a
+  `teamStatsServer` per team. Use it when a tab is a list of repeated sub-cards.
+
+### How modules receive data — the hybrid argument convention
+
+SlamStats passes everything as **plain preloaded data frames** plus one shared `r`.
+That is simple but means a module can't react to the user changing the scoring profile
+or season at the argument boundary. Hoop Vision uses a **hybrid** so settings changes
+propagate, while still keeping the cheap things cheap:
+
+| Argument kind                              | Passed as            | Why                                                |
+|--------------------------------------------|----------------------|----------------------------------------------------|
+| Static reference tables (team directory, player index) | **plain data frame** | Loaded once in `global.R`; never change at runtime — no need to wrap in `reactive()`. Matches SlamStats. |
+| User-selected state (`scoring()`, `season()`) | **`reactive()`**     | The whole point is that changing them re-renders every module consistently. |
+| The scored / filtered `player_box`          | **`reactive()`**     | It is derived from `scoring()`/`season()`, so it must be reactive too. |
+| Cross-module signals (clicked card, "go home", re-render counter) | **shared `r` reactiveValues** | One object created in `server.R`, threaded into every module (see §5). |
+
+Rule of thumb: **if it can change while the app is open, pass a `reactive()`; if it is
+fixed at startup, pass the plain data frame.** This keeps modules unit-testable (you can
+feed a `reactive()` or a static frame in a test) without the all-reactive ceremony.
 
 ---
 
@@ -131,6 +156,25 @@ Keep top-level shared reactives in `server.R` and pass them down:
 
 Avoid deep reactive chains. If two modules need to talk, route it through a small
 shared reactiveValues object created in `server.R`, not through the global env.
+
+**The shared `r` object (SlamStats pattern).** SlamStats creates one
+`r <- reactiveValues(...)` in `server()` and passes it as the last argument to every
+module. Hoop Vision follows this. It carries cross-cutting signals that don't belong to
+any single module, for example:
+
+```r
+# in server.R
+r <- reactiveValues(
+  clicked_player = NULL,   # set by a JS click bridge (see SHINYMOBILE_PATTERNS §)
+  chosen_tab     = NULL,    # the active tab, for tab-aware modules
+  render_table   = 0        # bump to force reactable re-render after a theme change
+)
+```
+
+The `render_table` counter is a real SlamStats trick: when dark mode flips we change the
+global `reactable.theme` and increment `r$render_table`; every `renderReactable` does
+`req(r$render_table)` so already-rendered tables redraw with the new theme. Document any
+new signal you add to `r` here so it doesn't become a junk drawer.
 
 ---
 

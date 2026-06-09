@@ -34,7 +34,7 @@ clear, well-commented modules over dense one-liners.
 | Data source      | `hoopR` (SportsDataverse; ~v3.1.0)                |
 | Data wrangling   | `dplyr`, `tidyr`, `lubridate`, `purrr`            |
 | Tables           | `reactable` (or `f7Table` for simple cases)       |
-| Charts           | `apexcharter` (pairs natively with Framework7)    |
+| Charts           | `echarts4r` (radar/bar/scatter) + `r2d3` for custom D3 |
 | Local cache      | `arrow` (parquet) and/or `duckdb`; `qs`/`readr`   |
 | Dependency mgmt  | `renv`                                             |
 | Tests            | `testthat`, `shinytest2`                           |
@@ -62,7 +62,7 @@ Hoop_Vision/
 │   │   ├── ingest_*.R        #   functions that CALL hoopR and write the cache
 │   │   ├── load_*.R          #   functions the app calls to READ the cache
 │   │   └── fantasy_score.R   #   pure scoring functions (see docs/FANTASY_SPEC.md)
-│   ├── modules/              # one Shiny module per feature (mod_*.R)
+│   ├── modules/              # one Shiny module per feature (camelCase, e.g. playerExplorer.R)
 │   └── utils/                # helpers, theming, formatting
 ├── data-cache/               # generated parquet/duckdb (gitignored)
 ├── scripts/                  # one-off + scheduled refresh scripts
@@ -114,7 +114,7 @@ Read `docs/DATA_HOOPR.md` before touching any `hoopR` call. The non-negotiables:
 - Every feature is a **Shiny module** rendered inside a tab. No business logic in
   `ui.R`.
 - Prefer native Framework7 components (`f7Card`, `f7List`, `f7Searchbar`, `f7Sheet`,
-  `f7Toast`, `apexcharter`) over generic Shiny widgets so the app feels native.
+  `f7Toast`, `echarts4r`) over generic Shiny widgets so the app feels native.
 - Theme with team / AthlyticZ colors via the `f7Page` options + a single CSS file in
   `www/`. Do not scatter inline styles across modules.
 

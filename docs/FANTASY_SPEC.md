@@ -113,11 +113,11 @@ Don't over-promise predictive power early.
 
 | Tab        | Module                | What it does                                             |
 |------------|-----------------------|----------------------------------------------------------|
-| Today      | `mod_today`           | tonight's games (`espn_nba_scoreboard` cache), notable fantasy lines |
-| Players    | `mod_player_explorer` | search a player → card with averages, trend chart, game log, fantasy value |
-| Rankings   | `mod_rankings`        | sortable leaderboard of fantasy value (season + trailing), filter by position |
-| Compare    | `mod_compare`         | pick 2–3 players → side-by-side stats + radar chart      |
-| Team       | `mod_team`            | build a roster, see combined category/points outlook, simple matchup |
+| Today      | `today`           | tonight's games (`espn_nba_scoreboard` cache), notable fantasy lines |
+| Players    | `playerExplorer`  | search a player → card with averages, trend chart, game log, fantasy value |
+| Rankings   | `rankings`        | sortable leaderboard of fantasy value (season + trailing), filter by position |
+| Compare    | `compare`         | pick 2–3 players → side-by-side stats + radar chart      |
+| Team       | `team`            | build a roster, see combined category/points outlook, simple matchup |
 
 Cross-cutting: a **settings sheet** (`f7Sheet`) for scoring profile, season, and
 season-type toggle.

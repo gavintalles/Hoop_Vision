@@ -19,7 +19,8 @@ Deliverables
 - Initialize the repo structure from `CLAUDE.md` §3 (create `R/`, `R/data/`,
   `R/modules/`, `R/utils/`, `scripts/`, `tests/testthat/`, `www/`, `docs/`).
 - `renv` initialized; install base stack (shiny, shinyMobile, hoopR, dplyr, tidyr,
-  lubridate, purrr, arrow, reactable, apexcharter, testthat, shinytest2); commit
+  lubridate, purrr, arrow, reactable, reactablefmtr, echarts4r, r2d3, shinyjs,
+  testthat, shinytest2); commit
   `renv.lock`.
 - `.gitignore`, `.Rprofile` (renv activate), `app.R`, `global.R`, `R/ui.R`,
   `R/server.R` as thin stubs.
@@ -77,12 +78,14 @@ and return a `fantasy_pts` column for a whole season in well under a second.
 **Goal:** the two screens that make it a usable product.
 
 Deliverables
-- `R/modules/mod_player_explorer.R`: `f7Searchbar` → select player → `f7Card` with
-  headshot, team colors, season averages, fantasy value, an `apexcharter` trend line,
+- `R/modules/playerExplorer.R` (`playerExplorerUI()`/`playerExplorerServer()`):
+  `f7Searchbar` over an `f7VirtualList` → select player → `f7Card`/`f7Popup` with
+  headshot, team colors, season averages, fantasy value, an `echarts4r` trend line,
   and a recent game log (`reactable`). Per-36 and trailing-N toggles.
-- `R/modules/mod_rankings.R`: `reactable` leaderboard of fantasy value (season +
-  trailing window), filter by position, color-scaled value column.
-- `R/modules/mod_settings.R` (or a shared `f7Sheet`): pick scoring profile, season,
+- `R/modules/rankings.R` (`rankingsUI()`/`rankingsServer()`): `reactable` leaderboard of
+  fantasy value (season + trailing window), filter by position, color-scaled value
+  column via `reactablefmtr::color_tiles()`.
+- `R/modules/settings.R` (or a shared `f7Sheet`): pick scoring profile, season,
   season-type toggle; wired to the shared `scoring()` / `season()` reactives in
   `server.R`.
 - Wire all three into `R/ui.R` + `R/server.R`.
@@ -100,9 +103,10 @@ on a phone viewport.
 **Goal:** the "decision tool" features.
 
 Deliverables
-- `R/modules/mod_compare.R`: pick 2–3 players → side-by-side stat table + radar chart
-  of category profile.
-- `R/modules/mod_team.R`: add players to a roster (shared `roster()` reactive), show
+- `R/modules/compare.R` (`compareUI()`/`compareServer()`): pick 2–3 players →
+  side-by-side stat table + `echarts4r` radar chart (`e_radar`) of category profile.
+- `R/modules/team.R` (`teamUI()`/`teamServer()`): add players to a roster (shared
+  `roster()` reactive), show
   combined points outlook and per-category strengths/weaknesses; a simple two-roster
   matchup view.
 - `R/data/projections.R`: MVP projection = blend of season + trailing-N average, shown
@@ -121,7 +125,8 @@ projected outlook, with projections clearly labeled as estimates.
 Deliverables
 - `R/data/ingest_scoreboard.R`: cache `espn_nba_scoreboard()` on a short refresh
   cadence (e.g. every 15 min during game hours) into `scoreboard.parquet`.
-- `R/modules/mod_today.R`: tonight's games, notable fantasy performances, quick links
+- `R/modules/today.R` (`todayUI()`/`todayServer()`): tonight's games, notable fantasy
+  performances, quick links
   into player explorer.
 - "Data as of <timestamp>" indicator in the app footer (read `_meta.json`).
 - Graceful empty states when no games / stale cache.
